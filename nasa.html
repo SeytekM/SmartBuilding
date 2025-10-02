@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Симулятор SmartBuilding</title>
+    
+    <!-- 1. Подключение Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    
+    <style>
+        /* 2. Встроенные стили CSS */
+        body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; background-color: #f0ffef; }
+        header { background-color: #004d40; color: white; padding: 15px 20px; text-align: center; border-bottom: 5px solid #00796b; }
+        #map { height: 65vh; width: 100%; border-bottom: 3px solid #004d40; }
+        #controls { padding: 20px; background: #ffffff; box-shadow: 0 -2px 10px rgba(0,0,0,0.15); border-radius: 8px 8px 0 0; }
+        h2 { color: #00796b; border-bottom: 2px solid #e0f2f1; padding-bottom: 5px; margin-top: 0; }
+        .control-group { margin-bottom: 15px; display: flex; align-items: center; }
+        button { 
+            background-color: #388e3c; 
+            color: white; 
+            border: none; 
+            padding: 10px 15px; 
+            font-size: 16px; 
+            cursor: pointer; 
+            border-radius: 5px; 
+            transition: background-color 0.3s;
+            margin-right: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button:hover { background-color: #2e7d32; }
+        #clear-button { background-color: #d32f2f; }
+        #clear-button:hover { background-color: #c62828; }
+        
+        #results { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px; }
+        .score-box { 
+            font-size: 2em; 
+            font-weight: bold; 
+            display: inline-block; 
+            padding: 8px 12px; 
+            border-radius: 5px; 
+            color: white;
+            min-width: 80px;
+            text-align: center;
+        }
+        .report-section { border: 1px solid #e0f2f1; padding: 15px; margin-top: 10px; border-radius: 6px; }
+        .report-section h4 { margin: 0 0 10px 0; color: #00796b; border-bottom: 1px solid #e0f2f1; padding-bottom: 5px; }
+
+        .verdict {
+            padding: 15px;
+            font-size: 1.2em;
+            font-weight: bold;
+            text-align: center;
+            border-radius: 8px;
+            margin-top: 20px;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>SmartBuilding (Кыргызстан) 🇰🇬</h1>
+        <p>Комплексный геоанализ: риски, экология, здоровье и демография.</p>
+    </header>
+
+    <!-- Контейнер для карты -->
+    <div id="map"></div>
+
+    <!-- Панель управления и вывода результатов -->
+    <div id="controls">
+        <h2>Инструменты и Управление</h2>
+        
+        <div class="control-group">
+            <label for="building_type" style="margin-right: 15px;">Тип планируемого объекта:</label>
+            <select id="building_type" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
+                <option value="residential">Жилой дом / Школа (Чувствителен к болезням/среде)</option>
+                <option value="industrial">Производственный объект / Завод (Чувствителен к логистике)</option>
+                <option value="wind_farm">Ветряная ферма / Энергообъект (Чувствителен к ветру/рельефу)</option>
+            </select>
+        </div>
+        
+        <button onclick="activatePlacementMode()">
+            📌 Разместить и Анализировать Объект
+        </button>
+        <button id="clear-button" onclick="clearAllMarkers()">
+            ❌ Очистить все объекты
+        </button>
+
+        <div id="results">
+            <!-- Отчеты будут добавляться сюда динамически -->
+        </div>
+    </div>
+
+    <!-- 3. Подключение Leaflet JS -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    
+    <!-- 4. Встроенный JavaScript для логики -->
+    <script>
+        // Инициализация карты
+        var map = L.map('map').setView([41.2044, 74.7661], 7); 
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var markers = L.layerGroup().addTo(map); 
+        var placementMode = false;
+        var markerCount = 0;
+
+        // --- Функция имитации комплексного запроса к Геопространственным Данным ---
+        async function fetchNASAData(lat, lng) {
+            await new Promise(resolve => setTimeout(resolve, 1500)); 
+
+            const isHighElevation = lat > 40.5 && lng > 76.5 && Math.random() < 0.8; 
+            const isNearCity = (Math.abs(lat - 42.87) < 0.2 && Math.abs(lng - 74.59) < 0.2); // Бишкек
+            const isSouthWest = lat < 41 && lng < 74; // Имитация Юго-Запада
+
+            // 1. Геология/Почва/Рельеф
+            const surfaceTypes = ['Скальный грунт', 'Осыпь/Оползнеопасный склон', 'Сельскохозяйственные угодья', 'Плотная застройка/Цемент', 'Зеленая зона/Парк'];
+            const landCoverType = isNearCity ? (Math.random() < 0.6 ? surfaceTypes[3] : surfaceTypes[4]) : surfaceTypes[Math.floor(Math.random() * 3)];
+            
+            const maxSlope = isHighElevation ? (25 + Math.random() * 35).toFixed(0) : (1 + Math.random() * 8).toFixed(0); 
+            const flatnessPercentage = (100 - maxSlope * 2.5).toFixed(0); // Плоскость 
+
+            // 2. Риски Стихийных Бедствий (НОВОЕ)
+            let naturalDisasterRisk = 'Низкий';
+            if (isHighElevation && maxSlope > 30) naturalDisasterRisk = 'Высокий (Оползни/Сели)';
+            else if (isSouthWest && Math.random() < 0.4) naturalDisasterRisk = 'Средний (Наводнения/Подтопления)';
+            
+            // 3. Здоровье/Демография (НОВОЕ)
+            const populationDensity = isNearCity ? (600 + Math.random() * 1800).toFixed(0) : (5 + Math.random() * 70).toFixed(0); 
+            const envStress = isNearCity || Math.random() < 0.1 ? 'Критическая (истощение водных/земельных ресурсов)' : 'Низкая (устойчивое состояние)';
+            
+            // Имитация распространенности болезней: выше в плотных/южных районах
+            const diseasePrevalence = (isNearCity ? 3.5 + Math.random() * 2 : 1 + Math.random() * 2).toFixed(1); // % больных на 1000
+
+            // 4. Климат/Логистика
+            const windSpeed = (isHighElevation ? 8 + Math.random() * 12 : 3 + Math.random() * 7).toFixed(1);
+            const roadProximity = isNearCity ? 'Отлично (менее 1 км)' : (Math.random() < 0.5 ? 'Хорошо (3-5 км)' : 'Плохо (более 10 км)');
+            const seismicRisk = isHighElevation ? (Math.random() < 0.4 ? 'Критически Высокий' : 'Высокий') : 'Средний';
+
+
+            return {
+                landCoverType: landCoverType,
+                maxSlope: parseFloat(maxSlope),
+                flatnessPercentage: parseFloat(flatnessPercentage),
+                naturalDisasterRisk: naturalDisasterRisk,
+                diseasePrevalence: parseFloat(diseasePrevalence),
+                populationDensity: parseFloat(populationDensity),
+                envStress: envStress,
+                windSpeed: parseFloat(windSpeed),
+                roadProximity: roadProximity,
+                seismicRisk: seismicRisk,
+                lat: lat,
+                lng: lng
+            };
+        }
+
+        // --- Функция расчета выгодности и безопасности (КОМПЛЕКСНАЯ) ---
+        function getAnalysisScore(data, buildingType) {
+            let safetyPenalty = 0;
+            let sustainabilityPenalty = 0; 
+            let healthPenalty = 0;
+            let efficiencyBonus = 0;
+            
+            let report = {
+                safety: { score: 100, factors: [] },
+                sustainability: { score: 100, factors: [] },
+                healthClimate: { score: 100, factors: [] }, // НОВЫЙ РАЗДЕЛ
+                efficiency: { score: 100, factors: [] },
+            };
+            let hardStopWarning = false; // Для критических факторов
+
+            // --- 1. АНАЛИЗ БЕЗОПАСНОСТИ (SAFETY & DISASTER RISK) ---
+            
+            // Сейсмика
+            if (data.seismicRisk === 'Критически Высокий') {
+                safetyPenalty += 40;
+                report.safety.factors.push('Сейсмика: Критический риск. (-40)');
+                if (buildingType === 'residential') hardStopWarning = true;
+            } else if (data.seismicRisk === 'Высокий') {
+                safetyPenalty += 20;
+                report.safety.factors.push('Сейсмика: Высокий риск. (-20)');
+            }
+
+            // Стихийные бедствия и Рельеф
+            if (data.naturalDisasterRisk.includes('Оползни') || data.landCoverType.includes('Оползнеопасный')) {
+                safetyPenalty += 50;
+                report.safety.factors.push(`**КРИТИЧЕСКИЙ РИСК:** Оползни/Сели. (${data.maxSlope}°). (-50)`);
+                hardStopWarning = true;
+            } else if (data.naturalDisasterRisk.includes('Наводнения') && data.flatnessPercentage > 80) {
+                safetyPenalty += 30;
+                report.safety.factors.push('Риск Наводнений: Высокий (плоская пойма реки). (-30)');
+            } else if (data.landCoverType.includes('Водоохранная зона')) {
+                safetyPenalty += 40;
+                report.safety.factors.push('Запрет: Находится в водоохранной/защитной зоне. (-40)');
+                hardStopWarning = true;
+            }
+            
+            // --- 2. АНАЛИЗ УСТОЙЧИВОСТИ (SUSTAINABILITY & DEMOGRAPHY) ---
+            
+            // Демографический стресс vs Среда
+            if (data.populationDensity > 800 && data.envStress.includes('Критическая')) {
+                sustainabilityPenalty += 40;
+                report.sustainability.factors.push(`Демографический стресс: Критическая плотность (${data.populationDensity} чел/км²) + Истощение ресурсов. **Нагрузка на среду ненормально большая.** (-40)`);
+            } else if (data.populationDensity > 300 && data.envStress.includes('Критическая')) {
+                sustainabilityPenalty += 20;
+                report.sustainability.factors.push(`Среда: Критическая нагрузка на ресурсы (воду/землю). (-20)`);
+            } else {
+                report.sustainability.factors.push('Устойчивое состояние: Нормальное соотношение населения и ресурсов. (+0)');
+            }
+
+            // --- 3. АНАЛИЗ ЗДОРОВЬЯ И ЭКОЛОГИИ (HEALTH & MICROCLIMATE) ---
+            
+            // Распространенность болезней
+            if (data.diseasePrevalence > 4.5) {
+                healthPenalty += 40;
+                report.healthClimate.factors.push(`Болезни: Высокая распространенность (${data.diseasePrevalence}%). **Высокий риск для жилого/школьного строительства.** (-40)`);
+                if (buildingType === 'residential') hardStopWarning = true;
+            } else if (data.diseasePrevalence > 3.0) {
+                healthPenalty += 20;
+                report.healthClimate.factors.push(`Болезни: Средняя распространенность. (-20)`);
+            }
+
+            // Зеленые зоны / Урбанизация
+            if (data.landCoverType.includes('Плотная застройка/Цемент')) {
+                healthPenalty += 15;
+                report.healthClimate.factors.push('Микроклимат: **Эффект "теплового острова"** (высокая температура, низкая влажность). (-15)');
+                if (buildingType === 'residential') healthPenalty += 10; // Дополнительный штраф для жилья
+            } else if (data.landCoverType.includes('Зеленая зона/Парк')) {
+                healthPenalty -= 10;
+                report.healthClimate.factors.push('Микроклимат: Зеленая зона (низкая температура, высокая влажность). (+10)');
+            }
+
+
+            // --- 4. АНАЛИЗ ВЫГОДНОСТИ/ЭФФЕКТИВНОСТИ (EFFICIENCY) ---
+
+            // Логистика/Инфраструктура
+            if (data.roadProximity === 'Плохо (более 10 км)') {
+                efficiencyBonus -= 25;
+                report.efficiency.factors.push('Логистика: Удаленность от дорог (>10 км), высокие затраты на подведение коммуникаций. (-25)');
+            } else if (data.roadProximity === 'Отлично (менее 1 км)') {
+                efficiencyBonus += 15;
+                report.efficiency.factors.push('Логистика: Отличная транспортная доступность. (+15)');
+            }
+            
+            // Специализация по Типу Объекта
+            if (buildingType === 'wind_farm') {
+                if (data.windSpeed > 10) {
+                    efficiencyBonus += 30;
+                    report.efficiency.factors.push('Энергетика: Высокий ветровой потенциал! (+30)');
+                } else if (data.windSpeed < 5) {
+                    efficiencyBonus -= 30;
+                    report.efficiency.factors.push('Энергетика: Низкий ветровой потенциал. (-30)');
+                }
+            } else if (buildingType === 'industrial') {
+                if (data.landCoverType.includes('Сельскохозяйственные угодья')) {
+                    efficiencyBonus -= 15;
+                    report.efficiency.factors.push('Землепользование: Потеря ценной сельхозземли. (-15)');
+                }
+            }
+
+
+            // Расчет итоговых баллов
+            report.safety.score = Math.max(0, 100 - safetyPenalty).toFixed(0);
+            report.sustainability.score = Math.max(0, 100 - sustainabilityPenalty).toFixed(0);
+            report.healthClimate.score = Math.max(0, 100 - healthPenalty).toFixed(0);
+            report.efficiency.score = Math.max(0, 100 + efficiencyBonus).toFixed(0);
+            
+            // Итоговый счет: Взвешенная сумма (Безопасность > Устойчивость/Здоровье > Выгодность)
+            const finalScore = (
+                0.40 * report.safety.score + 
+                0.30 * report.sustainability.score +
+                0.20 * report.healthClimate.score +
+                0.10 * report.efficiency.score
+            ).toFixed(0);
+
+
+            // --- ФИНАЛЬНЫЙ ВЕРДИКТ ---
+            let finalVerdict = { text: 'Рекомендовано к строительству', color: '#1b5e20', sub: 'Общая оценка рисков и выгодности положительная.' };
+
+            if (hardStopWarning) {
+                finalVerdict = { text: 'СТРОИТЕЛЬСТВО НЕВОЗМОЖНО / КРАЙНЕ ОПАСНО', color: '#b71c1c', sub: 'Обнаружены несовместимые с безопасностью факторы (Оползни, Водоохранная зона, Критическая сейсмика для жилья, Высокий риск болезней для жилья).' };
+            } else if (finalScore < 50) {
+                 finalVerdict = { text: 'НЕ РЕКОМЕНДОВАНО', color: '#ff6f00', sub: 'Риски значительно превышают потенциальную выгоду. Требуется пересмотр проекта.' };
+            } else if (finalScore < 70) {
+                finalVerdict = { text: 'УСЛОВНО РЕКОМЕНДОВАНО (С ПРЕДУПРЕЖДЕНИЕМ)', color: '#ffd600', sub: 'Проект возможен, но требует дополнительных мер по снижению рисков (укрепление фундамента, контроль болезней, улучшение инфраструктуры).' };
+            }
+
+
+            return { finalScore, report, finalVerdict };
+        }
+
+        // --- Обработчик клика по карте и функции очистки ---
+        map.on('click', async function(e) {
+            if (!placementMode) return;
+            markerCount++;
+            const markerId = `marker_${markerCount}`;
+            const lat = e.latlng.lat.toFixed(4);
+            const lng = e.latlng.lng.toFixed(4);
+            const buildingType = document.getElementById('building_type').value;
+            const buildingName = document.getElementById('building_type').options[document.getElementById('building_type').selectedIndex].text;
+
+            let currentMarker = L.marker([lat, lng]).addTo(markers);
+            currentMarker.bindPopup(`**Объект #${markerCount}: ${buildingName}**<br>⏳ Идет комплексный анализ...`).openPopup();
+            
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML += `<div id="${markerId}" style="margin-bottom: 20px; border: 2px solid #004d40; padding: 15px; border-radius: 8px;">
+                <h4>Объект #${markerCount}: ${buildingName} (${lat}, ${lng})</h4>
+                <p><strong>Оценка:</strong> <span class="score-box" style="background-color: gray;">...</span></p>
+            </div>`;
+            const currentReportDiv = document.getElementById(markerId);
+            
+            try {
+                const rawData = await fetchNASAData(lat, lng);
+                const { finalScore, report, finalVerdict } = getAnalysisScore(rawData, buildingType);
+                
+                let color;
+                if (finalScore >= 75) color = '#2e7d32'; 
+                else if (finalScore >= 50) color = '#ffa000';
+                else color = '#d32f2f'; 
+
+                currentMarker.setPopupContent(`
+                    <h3>Объект #${markerCount}: ${buildingName}</h3>
+                    <b>ИТОГОВАЯ ОЦЕНКА: <span style="color:${color};">${finalScore}/100</span></b>
+                    <hr style="margin: 5px 0;">
+                    <b>ВЕРДИКТ: ${finalVerdict.text}</b>
+                `).openPopup();
+
+                currentReportDiv.querySelector('.score-box').style.backgroundColor = color;
+                currentReportDiv.querySelector('.score-box').innerText = `${finalScore}/100`;
+                
+                // Детализированный отчет с четырьмя разделами и Вердиктом
+                currentReportDiv.innerHTML = `
+                    <h4>Объект #${markerCount}: ${buildingName} (${lat}, ${lng})</h4>
+                    
+                    <div class="verdict" style="background-color: ${finalVerdict.color};">
+                        ${finalVerdict.text} <br>
+                        <span style="font-size: 0.8em; font-weight: normal;">${finalVerdict.sub}</span>
+                    </div>
+
+                    <p style="margin: 10px 0;"><strong>ИТОГОВАЯ ОЦЕНКА:</strong> <span class="score-box" style="background-color: ${color};">${finalScore}/100</span></p>
+                    
+                    <div class="report-section">
+                        <h4>🛡️ Безопасность и Риски: ${report.safety.score}/100</h4>
+                        <ul style="list-style-type: none; padding-left: 0;">
+                            <li>**Сейсмический риск:** ${rawData.seismicRisk}</li>
+                            <li>**Стихийные бедствия:** ${rawData.naturalDisasterRisk}</li>
+                            <li>**Рельеф:** Плоскостность ${rawData.flatnessPercentage}% (Склон ${rawData.maxSlope}°)</li>
+                            <li>**Факторы:** ${report.safety.factors.join('<br>')}</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="report-section" style="background-color: #f1f8e9;">
+                        <h4>🌱 Устойчивость и Демография: ${report.sustainability.score}/100</h4>
+                        <ul style="list-style-type: none; padding-left: 0;">
+                            <li>**Плотность населения (имитация):** ${rawData.populationDensity} чел/км²</li>
+                            <li>**Нагрузка на ресурсы:** ${rawData.envStress}</li>
+                            <li>**Факторы:** ${report.sustainability.factors.join('<br>')}</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="report-section" style="background-color: #e0f2f1;">
+                        <h4>🏥 Здоровье и Экология: ${report.healthClimate.score}/100</h4>
+                        <ul style="list-style-type: none; padding-left: 0;">
+                            <li>**Распространенность болезней (имитация):** ${rawData.diseasePrevalence}%</li>
+                            <li>**Тип покрытия:** ${rawData.landCoverType} (Влажность/Температура)</li>
+                            <li>**Факторы:** ${report.healthClimate.factors.join('<br>')}</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="report-section">
+                        <h4>💰 Выгодность и Эффективность: ${report.efficiency.score}/100</h4>
+                        <ul style="list-style-type: none; padding-left: 0;">
+                            <li>**Доступ к дороге:** ${rawData.roadProximity}</li>
+                            <li>**Потенциал ветра:** ${rawData.windSpeed} м/с</li>
+                            <li>**Факторы:** ${report.efficiency.factors.join('<br>')}</li>
+                        </ul>
+                    </div>
+                `;
+
+            } catch (error) {
+                currentReportDiv.querySelector('.score-box').innerText = 'Ошибка!';
+                currentReportDiv.querySelector('.score-box').style.backgroundColor = '#dc3545';
+                console.error("Ошибка API:", error);
+            }
+        });
+
+        function activatePlacementMode() {
+            placementMode = true;
+            alert("✅ Режим размещения активирован. Выберите тип объекта и кликните на карту, чтобы получить комплексный отчет.");
+        }
+        
+        function clearAllMarkers() {
+            markers.clearLayers();
+            document.getElementById('results').innerHTML = '';
+            markerCount = 0;
+            placementMode = false;
+            alert("Карта очищена. Режим размещения выключен.");
+        }
+    </script>
+</body>
+</html>
