@@ -138,6 +138,7 @@
             text-align: center;
             margin-right: 15px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+            vertical-align: middle;
         }
         .report-section { 
             border: 1px solid #37475A; 
@@ -147,6 +148,7 @@
             background-color: #2C3E50;
         }
         .report-section h4 { color: #4CAF50; margin: 0 0 10px 0; border-bottom: 1px solid #37475A; padding-bottom: 5px; font-size: 1.1em; }
+        .report-factors li { margin-bottom: 5px; color: #B3C1CC; font-size: 0.9em; }
 
         /* Итоговый Вердикт */
         .verdict {
@@ -160,6 +162,24 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             border: 1px solid currentColor; /* Рамка того же цвета, что и фон */
         }
+        
+        /* Стиль для блока с геоданными */
+        .geo-data-grid {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #182029; /* Самый темный фон */
+            border-radius: 8px;
+            box-shadow: inset 0 0 10px rgba(0, 191, 255, 0.1);
+        }
+        .geo-item {
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #2C3E50; /* Темный сланец */
+            margin-bottom: 10px;
+        }
+        .geo-item p { margin: 0; font-size: 0.85em; }
+        .geo-item strong { color: #00BFFF; font-size: 1.1em; }
+
 
         /* Стиль для курсора в режиме рисования */
         .drawing-cursor {
@@ -182,6 +202,8 @@
             .control-group { flex-direction: column; align-items: stretch; gap: 10px; }
             .search-group input { min-width: auto; }
             button { width: 100%; }
+            #map { height: 50vh; }
+            .geo-data-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -192,7 +214,7 @@
             <span style="font-size: 2.5rem; margin-right: 15px;">🔬</span>
             SmartBuildingKG V25: Модуль Геопространственного Аудита
         </h1>
-        <p>Верифицированный комплексный анализ по системе $R$-факторов. Сертифицированное прогнозирование рисков для КР.</p>
+        <p>Верифицированный комплексный анализ по системе $R$-факторов. Сертифицированное прогнозирование рисков для КР. *Расширенный модуль Copernicus/WorldPop*</p>
     </header>
 
     <!-- Контейнер для карты -->
@@ -209,12 +231,12 @@
             <button onclick="handleStreetSearch()">
                 Инициировать $\text{A}(\zeta)$
             </button>
-            <div id="search_feedback" style="margin-top: 5px; color: #4CAF50; width: 100%; font-weight: 600;"></div>
+            <div id="search_feedback" style="margin-top: 5px; color: #4CAF50; width: 100%; font-weight: 600;">Введите адрес для поиска или активируйте Зональный Анализ.</div>
         </div>
 
         <!-- Выбор типа объекта (с использованием математической нотации) -->
         <div class="control-group">
-            <label for="building_type" style="margin-right: 15px; font-weight: 600; color: #E0E6EB;">🏗️ Категория Проекта:</label>
+            <label for="building_type" style="margin-right: 15px; font-weight: 600; color: #E0E6EB;">🏗 Категория Проекта:</label>
             <select id="building_type">
                 <option value="residential_block">Жилой комплекс (Базовый Коэффициент $R_1$)</option>
                 <option value="hospital">Медицинский центр (Критический Коэффициент $R_4$)</option>
@@ -227,7 +249,7 @@
         <!-- Кнопки управления картой -->
         <div class="control-group" style="background-color: #1F2A38;">
             <button onclick="activatePolygonMode()" style="background-color: #00BFFF;">
-                <span style="font-size: 1.2em; margin-right: 5px;">&#x29C4;</span> **Активировать Модуль Зонального Анализа** (Клик-Клик-Double Click)
+                <span style="font-size: 1.2em; margin-right: 5px;">&#x29C4;</span> *Активировать Модуль Зонального Анализа* (Клик-Клик-Double Click)
             </button>
             <button id="clear-button" onclick="clearAllMarkers()">
                 <span style="font-size: 1.2em; margin-right: 5px;">&#x2716;</span> Сброс и Очистка Слоя Аудита
@@ -245,7 +267,7 @@
         <p>
             Платформа SmartBuildingKG использует <strong>четыре ключевых вектора оценки</strong>, каждый из которых имеет весовой коэффициент: 
             <strong>Безопасность (40%)</strong>, Устойчивость (25%), Здоровье и Климат (20%), Эффективность (15%). 
-            Геопространственные данные симулируются на основе <strong>аттестованных климатических и топографических профилей</strong> Кыргызстана. Все отчеты следуют **Строгому Регламенту Оценки Рисков**.
+            *Расширенный модуль* интегрирует симулированные данные *Copernicus/WorldPop/WRI* для детализации климата, почвы и экологии. Все отчеты следуют *Строгому Регламенту Оценки Рисков*.
         </p>
     </div>
 
@@ -290,24 +312,49 @@
             if (score >= 50) return '#FF9800'; // Нерациональный проект (Оранжевый)
             return '#F44336'; // Запрещено (Красный)
         }
+        
+        // --- НОВАЯ ФУНКЦИЯ: Модуль Симуляции Географического Профиля (Copernicus/WRI/WorldPop) ---
+        function getEnvironmentalProfile(lat, lng) {
+            // A. Горные/Водные Зоны (Низкая плотность, Чистый воздух)
+            if (lng > 75.5 || lat < 41.5 || (lat > 42.0 && lat < 43.0 && lng > 76.5 && lng < 78.5)) {
+                 return {
+                    soil: { type: "Горные/Гидроморфные", suitability: "Низкая" },
+                    climate: { avgTemp: "+5 °C", humidity: "70%" },
+                    environment: { airQuality: "Высокая (PM2.5: < 10 µg/m³)", pollutionSource: "Нет. Естественные процессы.", greenZones: "Леса, альпийские луга." },
+                    healthRisk: { riskLevel: "Низкий. (Холодовой стресс)." }
+                };
+            }
+            
+            // B. Долины (Бишкек, Ош - Высокая плотность, Загрязнение)
+            return {
+                soil: { type: "Горно-долинные чернозёмы", suitability: "Высокая" },
+                climate: { avgTemp: "+12.2 °C", humidity: "60%" },
+                environment: { 
+                    airQuality: "Крайне низкая (PM2.5: ~44 µg/m³)", // Имитация данных WRI
+                    pollutionSource: "Угольное отопление, транспорт. Удерживается температурными инверсиями.", 
+                    greenZones: "Развитая сеть парков и бульваров." 
+                },
+                healthRisk: { riskLevel: "Критический. (Респираторные и сердечно-сосудистые заболевания)." }
+            };
+        }
 
-        // --- V25: Функция имитации комплексного запроса к Геопространственным Данным ---
-        async function fetchNASAData(lat, lng) {
+        // --- V25: Функция имитации комплексного запроса к Геопространственным Данным (Объединенная) ---
+        async function fetchGeospatialData(lat, lng) {
             await new Promise(resolve => setTimeout(resolve, 50)); 
             
             let landCoverCategory = 'LAND_SIMULATED'; 
             let altitude, maxSlope, seismicRisk, naturalDisasterRisk, windSpeed, roadProximity, populationDensity;
             let isUrbanPlateau = false; 
+            
+            // Получение детализированного профиля (Copernicus, WRI, WorldPop sim)
+            const envProfile = getEnvironmentalProfile(lat, lng);
 
-            // --- 1. СИМУЛЯЦИЯ ГЕОГРАФИЧЕСКИХ ЗОН КЫРГЫЗСТАНА ---
-
-            // A. Иссык-Куль (Вода)
-            if (lat > 42.0 && lat < 43.0 && lng > 76.5 && lng < 78.5) {
+            // --- 1. СИМУЛЯЦИЯ ГЕОГРАФИЧЕСКИХ ЗОН (ТОПОГРАФИЯ) ---
+            if (lat > 42.0 && lat < 43.0 && lng > 76.5 && lng < 78.5) { // Иссык-Куль
                 landCoverCategory = 'WATER_LAKE';
             } 
-            // B. Высокие Горы/Горные Хребты (Восток/Юг/Экстремальная высота)
-            else if (lng > 75.5 || lat < 41.5) {
-                altitude = 2500 + Math.random() * 1500; // 2500м - 4000м
+            else if (lng > 75.5 || lat < 41.5) { // Высокие Горы/Горные Хребты
+                altitude = 2500 + Math.random() * 1500; 
                 maxSlope = 15 + Math.random() * 25; 
                 seismicRisk = (Math.random() < 0.8) ? 'Критически Высокий' : 'Высокий'; 
                 naturalDisasterRisk = 'Критический (Оползни/Лавины)';
@@ -316,8 +363,7 @@
                 populationDensity = 10 + Math.random() * 100; 
                 if (altitude > 3500) landCoverCategory = 'MOUNTAIN_PEAK'; 
             }
-            // C. Долины и Плато (Бишкек / Чуйская долина)
-            else {
+            else { // Долины и Плато (Бишкек / Чуйская долина)
                 altitude = 700 + Math.random() * 500; 
                 maxSlope = 0.5 + Math.random() * 2; 
                 seismicRisk = (Math.random() < 0.6) ? 'Высокий' : 'Средний'; 
@@ -341,32 +387,27 @@
             
             const flatnessPercentage = (100 - parseFloat(maxSlope) * 1.5).toFixed(0); 
 
-            // --- 3. ГЕНЕРАЦИЯ ОСТАЛЬНЫХ ПАРАМЕТРОВ ---
-            const diseasePrevalence = 1.0 + Math.random() * 3.0; 
-            const landTemp = 15 + Math.random() * 25; 
-            const envStress = (populationDensity > 800) ? 'Высокая' : 'Умеренная';
-
             return {
+                // Топография и База (V25 Original)
                 landCoverType: 'Симулированный грунт',
                 maxSlope: parseFloat(maxSlope.toFixed(1)), 
                 flatnessPercentage: parseFloat(flatnessPercentage),
                 naturalDisasterRisk: naturalDisasterRisk,
                 seismicRisk: seismicRisk,
-                diseasePrevalence: parseFloat(diseasePrevalence.toFixed(1)),
                 populationDensity: parseFloat(populationDensity.toFixed(0)),
-                envStress: envStress,
                 roadProximity: roadProximity,
-                landTemp: parseFloat(landTemp.toFixed(1)), 
                 windSpeed: parseFloat(windSpeed.toFixed(1)),
                 altitude: parseFloat(altitude.toFixed(0)), 
                 landCoverCategory: landCoverCategory, 
                 lat: lat,
                 lng: lng,
-                isUrbanPlateau: isUrbanPlateau
+                isUrbanPlateau: isUrbanPlateau,
+                // НОВЫЕ ДАННЫЕ (Copernicus/WorldPop/WRI)
+                envProfile: envProfile
             };
         }
 
-        // --- V25: Функция расчета выгодности и безопасности (АУДИТ) ---
+        // --- V25: Функция расчета выгодности и безопасности (АУДИТ) - Обновленная ---
         function getAnalysisScore(data, buildingType) {
             let safetyPenalty = 0;
             let sustainabilityPenalty = 0; 
@@ -389,15 +430,15 @@
                 reason = (data.landCoverCategory.includes('WATER_')) ? 'Критическая зона: Водоем/Озеро' : 'Критическая логистика';
             }
             if (data.landCoverCategory === 'MOUNTAIN_PEAK' || data.altitude > 3500) {
-                 reason = (data.landCoverCategory === 'MOUNTAIN_PEAK') ? 'Горный пик/Ледник (недоступность)' : `Превышение высоты ($>3500 \\text{ м}$)`;
+                 reason = (data.landCoverCategory === 'MOUNTAIN_PEAK') ? 'Горный пик/Ледник (недоступность)' : Превышение высоты ($>3500 \\text{ м}$);
             }
             
             if (reason) {
-                report.safety.factors.push(`**АБСОЛЮТНЫЙ ЗАПРЕТ:** ${reason}. Нарушение Технического Регламента.`);
+                report.safety.factors.push(**АБСОЛЮТНЫЙ ЗАПРЕТ:** ${reason}. Нарушение Технического Регламента.);
                 return {
                     finalScore: 0,
                     report, 
-                    finalVerdict: { text: 'АУДИТ: КРИТИЧЕСКИЙ ОТКАЗ', color: '#F44336', sub: `Причина: ${reason}` },
+                    finalVerdict: { text: 'АУДИТ: КРИТИЧЕСКИЙ ОТКАЗ', color: '#F44336', sub: Причина: ${reason} },
                     safetyScore: 0
                 };
             }
@@ -406,7 +447,7 @@
             if (data.isUrbanPlateau) {
                 const safetyBoost = 25;
                 safetyPenalty -= safetyBoost;
-                report.safety.factors.push(`**ИНЖЕНЕРНЫЙ БОНУС:** Стабильное городское плато. ($+25$ по безопасности)`);
+                report.safety.factors.push(**ИНЖЕНЕРНЫЙ БОНУС:** Стабильное городское плато. ($+25$ по безопасности));
             }
 
             // --- 2. ВЕКТОР БЕЗОПАСНОСТИ (SAFETY & DISASTER RISK) - ВЕС 40% ---
@@ -416,20 +457,35 @@
             
             if (data.maxSlope > 20) { 
                  safetyPenalty += 60;
-                 report.safety.factors.push(`**КРИТИЧЕСКИЙ РИСК:** Экстремальный уклон ($>20^\circ$). Высокий риск оползней. ($-60$)`);
+                 report.safety.factors.push(**КРИТИЧЕСКИЙ РИСК:** Экстремальный уклон ($>20^\circ$). Высокий риск оползней. ($-60$));
                  hardStopWarning = true; 
             } else if (data.maxSlope > 10) {
                  safetyPenalty += 25; 
-                 report.safety.factors.push(`Повышенный риск: Крутой склон (${data.maxSlope}^\circ$). Требуется укрепление. ($-25$)`);
+                 report.safety.factors.push(Повышенный риск: Крутой склон (${data.maxSlope}^\circ$). Требуется укрепление. ($-25$));
             }
 
+            if (data.naturalDisasterRisk.includes('Критический')) { safetyPenalty += 20; report.safety.factors.push(Критический риск ${data.naturalDisasterRisk} ($-20$)); }
+            
             // --- 3. ВЕКТОР УСТОЙЧИВОСТИ (SUSTAINABILITY & DEMOGRAPHY) - ВЕС 25% ---
             
-            if (data.populationDensity > 1200) { sustainabilityPenalty += 50; report.sustainability.factors.push(`Демографический стресс: Критическая плотность. (Перегрузка инфраструктуры). ($-50$)`); } 
+            if (data.populationDensity > 1200) { sustainabilityPenalty += 50; report.sustainability.factors.push(Демографический стресс (WorldPop sim): Критическая плотность. ($-50$)); } 
+            else if (data.populationDensity < 100) { sustainabilityPenalty += 10; report.sustainability.factors.push(Низкая плотность (WorldPop sim): Неэффективное использование инфраструктуры. ($-10$)); }
+            
+            if (data.envProfile.environment.airQuality.includes("Крайне низкая")) { sustainabilityPenalty += 30; report.sustainability.factors.push(Эко-Стресс (WRI sim): Сильное загрязнение воздуха. ($-30$)); }
             
             // --- 4. ВЕКТОР ЗДОРОВЬЯ И КЛИМАТА (HEALTH & MICROCLIMATE) - ВЕС 20% ---
             
-            if (data.diseasePrevalence > 4.5) { healthPenalty += 70; report.healthClimate.factors.push(`Биологический риск: Высокая распространенность патогенов. ($-70$)`); } 
+            // НОВЫЙ ФАКТОР: Качество Воздуха
+            if (data.envProfile.environment.airQuality.includes("Крайне низкая")) {
+                healthPenalty += 60; 
+                report.healthClimate.factors.push(**ЭКО-КРИЗИС:** Критическое загрязнение воздуха PM2.5. (Симуляция WRI/Copernicus). ($-60$));
+            } else if (data.envProfile.environment.airQuality.includes("Низкая")) {
+                healthPenalty += 30; 
+                report.healthClimate.factors.push(**ЭКО-РИСК:** Низкое качество воздуха. ($-30$));
+            }
+
+            // НОВЫЙ ФАКТОР: Уровень Риска Здоровья
+            if (data.envProfile.healthRisk.riskLevel === 'Критический') { healthPenalty += 30; report.healthClimate.factors.push(Биологический риск: Высокая распространенность респираторных патогенов. ($-30$)); }
             
             // --- 5. ВЕКТОР ВЫГОДНОСТИ/ЭФФЕКТИВНОСТИ (EFFICIENCY) - ВЕС 15% ---
 
@@ -444,8 +500,13 @@
                 report.efficiency.factors.push('Логистика: Идеальная транспортная доступность. ($+15$)');
             }
             
-            // Специализация по Типу Объекта
-            if (buildingType === 'wind_farm') {
+            // НОВЫЙ ФАКТОР: Пригодность Почвы (для с/х, озеленения)
+            if (buildingType !== 'industrial' && buildingType !== 'wind_farm') {
+                if (data.envProfile.soil.suitability === 'Высокая') {
+                    efficiencyBonus += 10;
+                    report.efficiency.factors.push(Природный ресурс (Copernicus sim): Высокая пригодность почвы для озеленения/с/х. ($+10$));
+                }
+            } else if (buildingType === 'wind_farm') {
                 if (data.windSpeed > 15) { efficiencyBonus += 35; report.efficiency.factors.push('Энергетика: Идеальный ветровой потенциал. ($+35$)'); } 
                 else if (data.windSpeed < 7) { efficiencyBonus -= 50; report.efficiency.factors.push('Энергетика: Низкий ветровой потенциал. ($-50$)'); }
             } else if (data.windSpeed > 15 && buildingType !== 'wind_farm') {
@@ -453,12 +514,14 @@
                  report.safety.factors.push('Сильный ветер: Дополнительный структурный риск. ($-15$)');
             }
 
+            // Фиксация минимального 0 и максимального 100 баллов для отчетов
             const safetyScore = Math.max(0, 100 - safetyPenalty);
             report.safety.score = safetyScore.toFixed(0);
             report.sustainability.score = Math.max(0, 100 - sustainabilityPenalty).toFixed(0);
             report.healthClimate.score = Math.max(0, 100 - healthPenalty).toFixed(0);
             report.efficiency.score = Math.max(0, 100 + efficiencyBonus).toFixed(0);
             
+            // Расчет Финального Оценочного Ба
             const finalScore = (
                 0.40 * report.safety.score + 
                 0.25 * report.sustainability.score + 
@@ -480,7 +543,153 @@
             return { finalScore: parseInt(finalScore), report, finalVerdict, safetyScore: safetyScore };
         }
         
-        // --- V25: Функции для работы с Полигоном (Логика не изменена) ---
+        // --- V25: Функция точечного анализа (Полная реализация) ---
+        async function simulateMarkerAnalysis(lat, lng, buildingType, locationName) {
+            markerCount++;
+            const markerId = point_marker_${markerCount};
+            const buildingNameText = document.getElementById('building_type').options[document.getElementById('building_type').selectedIndex].text;
+            const resultsDiv = document.getElementById('results');
+
+            // Создание временного отчета
+            const newReportHtml = `<div id="${markerId}" class="result-card">
+                <h4>Отчет #${markerCount}: Точечный Аудит Координаты $\zeta$ - ${locationName}</h4>
+                <p><strong>Идет $\text{A}(\zeta)$:</strong> <span class="score-box" style="background-color: gray;">...</span></p>
+            </div>`;
+            resultsDiv.innerHTML = newReportHtml + resultsDiv.innerHTML;
+            const currentReportDiv = document.getElementById(markerId);
+
+            currentReportDiv.innerHTML += <p style="font-style: italic; color: #B3C1CC;">Инициируется запрос к симулятору $R$-факторов (V25 Enhanced)...</p>;
+
+            // *НОВЫЙ ВЫЗОВ ФУНКЦИИ*
+            const rawData = await fetchGeospatialData(lat, lng);
+            const result = getAnalysisScore(rawData, buildingType);
+            
+            const finalColor = getColorForScore(result.finalScore);
+
+            // Добавление маркера на карту
+            L.marker([lat, lng], {
+                icon: L.divIcon({
+                    className: 'custom-div-icon',
+                    html: <div style="background-color: ${finalColor}; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>,
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                })
+            })
+            .bindPopup(`
+                <h3>Координата $\zeta$: ${locationName}</h3>
+                <b>ИТОГОВАЯ ОЦЕНКА $\mathcal{S}_{final}$: <span style="color:${finalColor};">${result.finalScore}/100</span></b>
+                <hr style="margin: 5px 0;">
+                <b>ВЕРДИКТ: ${result.finalVerdict.text}</b>
+                <br><small>${result.finalVerdict.sub}</small>
+            `)
+            .openPopup()
+            .addTo(markers);
+
+            // Функция для форматирования списка факторов
+            const formatFactors = (factors) => {
+                if (factors.length === 0) return '<li><span style="color: #00BFFF;">Нет критических факторов. (Оценка $100$)</span></li>';
+                return factors.map(f => <li>${f}</li>).join('');
+            };
+
+            // Обновление детального отчета
+            currentReportDiv.innerHTML = `
+                <h4>Отчет #${markerCount}: Точечный Аудит Координаты $\zeta$ - ${locationName} (${buildingNameText})</h4>
+                
+                <div class="verdict" style="background-color: ${result.finalVerdict.color};">
+                    ${result.finalVerdict.text} <br>
+                    <span style="font-size: 0.8em; font-weight: normal;">${result.finalVerdict.sub}</span>
+                </div>
+
+                <p style="margin: 15px 0;">
+                    <span style="font-size: 1.1em; font-weight: 600; color: #00BFFF;">ИТОГОВЫЙ ОЦЕНОЧНЫЙ БАЛЛ $\mathcal{S}_{final}$:</span> 
+                    <span class="score-box" style="background-color: ${finalColor};">${result.finalScore}/100</span>
+                </p>
+
+                <!-- НОВЫЙ БЛОК: ГЕОГРАФИЧЕСКИЕ ДАННЫЕ (РЯДОМ С ОЦЕНКОЙ) -->
+                <div class="geo-data-grid grid grid-cols-2 gap-4">
+                    <div class="geo-item">
+                        <p>Топография & Склон</p>
+                        <p><strong>${rawData.maxSlope}$^\circ$</strong> (Плоскость: ${rawData.flatnessPercentage}\%)</p>
+                    </div>
+                    <div class="geo-item">
+                        <p>Почвенный Режим</p>
+                        <p><strong>${rawData.envProfile.soil.type}</strong> (${rawData.envProfile.soil.suitability})</p>
+                    </div>
+                    <div class="geo-item">
+                        <p>Абсолютная Высота</p>
+                        <p><strong>${rawData.altitude} м.</strong></p>
+                    </div>
+                    <div class="geo-item">
+                        <p>Чистота Воздуха (PM2.5)</p>
+                        <p><b style="color: ${rawData.envProfile.environment.airQuality.includes('Крайне низкая') ? '#FF5733' : '#4CAF50'};">${rawData.envProfile.environment.airQuality}</b></p>
+                    </div>
+                    <div class="geo-item col-span-2">
+                        <p>Климат & Плотность</p>
+                        <p><strong>$\text{T}_{avg}$: ${rawData.envProfile.climate.avgTemp}</strong> | $\rho$: ${rawData.populationDensity} чел/км$^2$</p>
+                    </div>
+                </div>
+                <!-- КОНЕЦ НОВОГО БЛОКА -->
+
+                <!-- Детализация $R$-факторов -->
+                <div class="report-section" style="margin-top: 25px; border-color: #F44336;">
+                    <h4>1. Вектор Безопасности (40%) $\mathcal{R}_{safety}$ | Оценка: ${result.report.safety.score}/100</h4>
+                    <ul class="report-factors" style="list-style-type: none; padding-left: 0;">
+                        ${formatFactors(result.report.safety.factors)}
+                    </ul>
+                </div>
+
+                <div class="report-section" style="border-color: #FFC107;">
+                    <h4>2. Вектор Устойчивости (25%) $\mathcal{R}_{sustain}$ | Оценка: ${result.report.sustainability.score}/100</h4>
+                    <ul class="report-factors" style="list-style-type: none; padding-left: 0;">
+                        ${formatFactors(result.report.sustainability.factors)}
+                    </ul>
+                </div>
+
+                <div class="report-section" style="border-color: #4CAF50;">
+                    <h4>3. Вектор Здоровья & Климата (20%) $\mathcal{R}_{health}$ | Оценка: ${result.report.healthClimate.score}/100</h4>
+                    <ul class="report-factors" style="list-style-type: none; padding-left: 0;">
+                        ${formatFactors(result.report.healthClimate.factors)}
+                    </ul>
+                </div>
+
+                <div class="report-section" style="border-color: #00BFFF;">
+                    <h4>4. Вектор Эффективности (15%) $\mathcal{R}_{eff}$ | Оценка: ${result.report.efficiency.score}/100</h4>
+                    <ul class="report-factors" style="list-style-type: none; padding-left: 0;">
+                        ${formatFactors(result.report.efficiency.factors)}
+                    </ul>
+                </div>
+            `;
+        }
+
+        // --- V25: Функция поиска по адресу ---
+        function handleStreetSearch() {
+            const searchInput = document.getElementById('street_search').value.toLowerCase().trim();
+            const feedbackDiv = document.getElementById('search_feedback');
+            const buildingType = document.getElementById('building_type').value;
+
+            const foundKey = Object.keys(STREET_COORDINATES).find(key => searchInput.includes(key));
+            
+            feedbackDiv.style.color = '#FFC107';
+            feedbackDiv.innerText = "⏳ Идет поиск и обработка запроса...";
+
+            if (foundKey) {
+                const coord = STREET_COORDINATES[foundKey];
+                
+                // Центрирование карты на найденной координате
+                map.setView([coord.lat, coord.lng], 14); 
+
+                // Вызов функции анализа
+                simulateMarkerAnalysis(coord.lat, coord.lng, buildingType, coord.name);
+
+                feedbackDiv.style.color = '#4CAF50';
+                feedbackDiv.innerText = ✅ Верификация Координаты $\zeta$ завершена: ${coord.name}. Сгенерирован Аудит #${markerCount}.;
+            } else {
+                feedbackDiv.style.color = '#F44336';
+                feedbackDiv.innerText = "❌ Ошибка: Введенный адрес не найден в Базе Координат V25. Попробуйте один из примеров (Чуй, Манаса, Иссык-Куль, Ош).";
+            }
+        }
+        
+        // --- V25: Функции для работы с Полигоном (Логика не изменена, использует новую функцию данных) ---
         
         function isPointInPolygon(point, vs) {
             var x = point.lng, y = point.lat;
@@ -496,16 +705,16 @@
 
         async function startAreaAnalysis(finalPoly) {
             markerCount++;
-            const markerId = `area_marker_${markerCount}`;
+            const markerId = area_marker_${markerCount};
             const buildingType = document.getElementById('building_type').value;
             const buildingName = document.getElementById('building_type').options[document.getElementById('building_type').selectedIndex].text;
-            const numSamples = 10; 
+            const numSamples = 15; // Увеличим количество выборок для точности
             const resultsDiv = document.getElementById('results');
             
             const bounds = finalPoly.getBounds();
             const vertices = finalPoly.getLatLngs()[0]; 
 
-            finalPoly.bindPopup(`**Область #${markerCount}:** ${buildingName}<br>⏳ Идет Верификация Зоны...`).openPopup();
+            finalPoly.bindPopup(**Область #${markerCount}:** ${buildingName}<br>⏳ Идет Верификация Зоны...).openPopup();
 
             const newReportHtml = `<div id="${markerId}" class="result-card">
                 <h4>Отчет #${markerCount}: Зональный Геопространственный Аудит (${buildingName})</h4>
@@ -517,8 +726,9 @@
             let allScores = [];
             let allSafetyScores = [];
             let hardStopCount = 0;
-            
-            currentReportDiv.innerHTML += `<p style="font-style: italic; color: #B3C1CC;">Идет выборка и верификация ${numSamples} ключевых точек...</p>`;
+            let firstSampledData = null; // Храним данные первой точки для отображения профиля
+
+            currentReportDiv.innerHTML += <p style="font-style: italic; color: #B3C1CC;">Идет выборка и верификация ${numSamples} ключевых точек (Enhanced Module)...</p>;
 
             let pointsFound = 0;
             let attempts = 0;
@@ -537,16 +747,21 @@
                 if (isPointInPolygon(sampleLatLng, vertices)) {
                     pointsFound++;
                     
-                    const rawData = await fetchNASAData(sampleLatLng.lat, sampleLatLng.lng);
+                    // *НОВЫЙ ВЫЗОВ ФУНКЦИИ*
+                    const rawData = await fetchGeospatialData(sampleLatLng.lat, sampleLatLng.lng);
                     const result = getAnalysisScore(rawData, buildingType);
                     
+                    if (!firstSampledData) {
+                         firstSampledData = rawData; // Сохраняем данные первой точки для отображения профиля
+                    }
+
                     allScores.push(result.finalScore);
                     allSafetyScores.push(result.safetyScore);
 
                     if (result.finalScore === 0) {
                         hardStopCount++;
                         L.circleMarker(sampleLatLng, { radius: 4, color: '#F44336', fillOpacity: 1 }).addTo(markers)
-                            .bindPopup(`**Точка ${pointsFound} (КРИТИЧЕСКИЙ ОТКАЗ):** ${result.finalVerdict.sub}`);
+                            .bindPopup(**Точка ${pointsFound} (КРИТИЧЕСКИЙ ОТКАЗ):** ${result.finalVerdict.sub});
                     } else {
                         L.circleMarker(sampleLatLng, { radius: 2, color: getColorForScore(result.finalScore), fillOpacity: 1 }).addTo(markers);
                     }
@@ -554,7 +769,7 @@
             }
             
             if (attempts === maxAttempts) {
-                 currentReportDiv.innerHTML += `<p style="color: #FF9800;">⚠️ **Внимание:** Не удалось набрать 10 точек. Зональный анализ может быть неполным.</p>`;
+                 currentReportDiv.innerHTML += <p style="color: #FF9800;">⚠ **Внимание:** Не удалось набрать ${numSamples} точек. Зональный анализ может быть неполным.</p>;
             }
 
             const avgScore = (pointsFound === 0) ? 0 : allScores.reduce((a, b) => a + b, 0) / pointsFound;
@@ -563,22 +778,22 @@
 
             const finalColor = getColorForScore(avgScore);
             
-            let finalVerdict = { text: 'АУДИТ ПРОЙДЕН: ВЫСОКИЙ ПОТЕНЦИАЛ', color: '#4CAF50', sub: `Средний балл: ${avgScore.toFixed(0)}/100. Минимальный балл: ${minScore}/100.` }; 
+            let finalVerdict = { text: 'АУДИТ ПРОЙДЕН: ВЫСОКИЙ ПОТЕНЦИАЛ', color: '#4CAF50', sub: Средний балл: ${avgScore.toFixed(0)}/100. Минимальный балл: ${minScore}/100. }; 
             
             if (hardStopCount > 0) {
                 finalVerdict = { 
                     text: 'АУДИТ: КРИТИЧЕСКИЙ ОТКАЗ', 
                     color: '#F44336', 
-                    sub: `Обнаружено ${hardStopCount} нарушений Технического Регламента (Абсолютный Запрет).` 
+                    sub: Обнаружено ${hardStopCount} нарушений Технического Регламента (Абсолютный Запрет). 
                 };
             } else if (minSafetyScore < 50 || avgScore < 70) { 
                  finalVerdict = { 
                     text: 'АУДИТ: НИЗКАЯ РЕНТАБЕЛЬНОСТЬ', 
                     color: '#FF9800', 
-                    sub: `Минимальный балл: ${minScore}/100. Высокие затраты на компенсацию рисков.` 
+                    sub: Минимальный балл: ${minScore}/100. Высокие затраты на компенсацию рисков. 
                 };
             } else if (avgScore < 85) { 
-                finalVerdict = { text: 'АУДИТ: ПРИЕМЛЕМЫЙ (ТРЕБУЕТСЯ ДЕТАЛИЗАЦИЯ)', color: '#FFC107', sub: `Средний балл: ${avgScore.toFixed(0)}/100. Проект имеет управляемые недостатки.` };
+                finalVerdict = { text: 'АУДИТ: ПРИЕМЛЕМЫЙ (ТРЕБУЕТСЯ ДЕТАЛИЗАЦИЯ)', color: '#FFC107', sub: Средний балл: ${avgScore.toFixed(0)}/100. Проект имеет управляемые недостатки. };
             }
 
             finalPoly.setPopupContent(`
@@ -589,7 +804,39 @@
             `).openPopup();
             
             currentReportDiv.querySelector('.score-box').style.backgroundColor = finalColor;
-            currentReportDiv.querySelector('.score-box').innerText = `${avgScore.toFixed(0)}/100`;
+            currentReportDiv.querySelector('.score-box').innerText = ${avgScore.toFixed(0)}/100;
+
+            // Форматирование геоданных для зонального отчета (на основе первой точки)
+            let geoDataHtml = ``;
+            if (firstSampledData) {
+                geoDataHtml = `
+                    <div class="geo-data-grid grid grid-cols-2 gap-4">
+                        <div class="geo-item">
+                            <p>Доминирующий Склон</p>
+                            <p><strong>${firstSampledData.maxSlope}$^\circ$</strong> (Плоскость: ${firstSampledData.flatnessPercentage}\%)</p>
+                        </div>
+                        <div class="geo-item">
+                            <p>Доминирующий Тип Почвы</p>
+                            <p><strong>${firstSampledData.envProfile.soil.type}</strong> (${firstSampledData.envProfile.soil.suitability})</p>
+                        </div>
+                        <div class="geo-item">
+                            <p>Абсолютная Высота (Сред.)</p>
+                            <p><strong>${firstSampledData.altitude} м.</strong></p>
+                        </div>
+                        <div class="geo-item">
+                            <p>Доминирующая Чистота Воздуха</p>
+                            <p><b style="color: ${firstSampledData.envProfile.environment.airQuality.includes('Крайне низкая') ? '#FF5733' : '#4CAF50'};">${firstSampledData.envProfile.environment.airQuality}</b></p>
+                        </div>
+                         <div class="geo-item col-span-2">
+                            <p>Климат & Плотность</p>
+                            <p><strong>$\text{T}{avg}$: ${firstSampledData.envProfile.climate.avgTemp}</strong> | $\rho{avg}$: ${firstSampledData.populationDensity} чел/км$^2$</p>
+                        </div>
+                    </div>
+                    <small style="color:#B3C1CC; display:block; margin-top: 10px;">* Геопространственный Профиль основан на анализе ключевой (первой) точки зоны.</small>
+                `;
+            } else {
+                geoDataHtml = <p style="color: #FF9800;">Не удалось собрать данные о профиле зоны.</p>;
+            }
 
             currentReportDiv.innerHTML = `
                 <h4>Отчет #${markerCount}: Зональный Геопространственный Аудит (${buildingName})</h4>
@@ -600,18 +847,24 @@
                 </div>
 
                 <p style="margin: 15px 0;">
-                    <span style="font-size: 1.1em; font-weight: 600; color: #00BFFF;">ИТОГОВЫЙ ОЦЕНОЧНЫЙ БАЛЛ $\\mathcal{S}_{final}$:</span> 
+                    <span style="font-size: 1.1em; font-weight: 600; color: #00BFFF;">СРЕДНИЙ ОЦЕНОЧНЫЙ БАЛЛ $\mathcal{S}_{final}$:</span> 
                     <span class="score-box" style="background-color: ${finalColor};">${avgScore.toFixed(0)}/100</span>
                     <br>
                     <small style="margin-left: 10px; color: #B3C1CC;">
                         Мин. балл в выборке: <b>${minScore}/100</b> | Нарушений Регламента: <b>${hardStopCount}</b>
                     </small>
                 </p>
+                
+                <div class="report-section">
+                    <h4>🗺 Геопространственный Профиль Зоны (Сводный)</h4>
+                    ${geoDataHtml}
+                </div>
+
                 <div class="report-section">
                     <h4>📊 Статистика Зоны</h4>
                     <ul style="list-style-type: none; padding-left: 0;">
-                         <li>**Кол-во верифицированных точек:** ${pointsFound}</li>
-                         <li>**Геометрия:** Полигон (${vertices.length} вершин)</li>
+                        <li>*Кол-во верифицированных точек:* ${pointsFound}</li>
+                        <li>*Геометрия:* Полигон (${vertices.length} вершин)</li>
                     </ul>
                 </div>
             `;
@@ -631,7 +884,7 @@
                     currentPolyline = null;
                 }
                 map.getContainer().classList.add('drawing-cursor');
-                document.getElementById('search_feedback').innerText = "✅ **Режим Зонального Анализа Активен.** Кликните, чтобы добавить вершину. **Дважды кликните**, чтобы завершить и запустить аудит.";
+                document.getElementById('search_feedback').innerText = "✅ *Режим Зонального Анализа Активен.* Кликните, чтобы добавить вершину. *Дважды кликните*, чтобы завершить и запустить аудит.";
             } else {
                 map.getContainer().classList.remove('drawing-cursor');
                 document.getElementById('search_feedback').innerText = "Режим Анализа Выключен. Нажмите кнопку для активации.";
@@ -659,14 +912,16 @@
         map.on('dblclick', function(e) {
             if (!isDrawingPolygon) return;
             if (polygonPoints.length < 3) {
-                document.getElementById('search_feedback').innerText = "⚠️ **Ошибка Регламента:** Для формирования зоны требуется минимум 3 вершины.";
+                document.getElementById('search_feedback').innerText = "⚠ *Ошибка Регламента:* Для формирования зоны требуется минимум 3 вершины.";
                 return;
             }
             
             isDrawingPolygon = false;
             map.getContainer().classList.remove('drawing-cursor');
             
-            markers.removeLayer(currentPolyline);
+            if (currentPolyline) {
+                markers.removeLayer(currentPolyline);
+            }
             polygonMarkers.clearLayers();
             currentPolyline = null;
             
@@ -677,147 +932,20 @@
             polygonPoints = [];
         });
 
-
-        // --- Точечный анализ (логика не изменена) ---
-        function simulateStreetSearch(query) {
-            const normalizedQuery = query.trim().toLowerCase();
-            for (const key in STREET_COORDINATES) {
-                if (normalizedQuery.includes(key) || STREET_COORDINATES[key].name.toLowerCase().includes(normalizedQuery)) {
-                    return STREET_COORDINATES[key];
-                }
-            }
-            return null;
-        }
-
-        function handleStreetSearch() {
-            const searchInput = document.getElementById('street_search').value.toLowerCase().trim();
-            const feedbackDiv = document.getElementById('search_feedback');
-            feedbackDiv.innerText = '';
-            
-            if (!searchInput) {
-                feedbackDiv.innerText = "Введите название улицы или объекта для запуска точечного аудита.";
-                return;
-            }
-            
-            const foundLocation = simulateStreetSearch(searchInput);
-            
-            if (foundLocation) {
-                feedbackDiv.innerText = `✅ Геокодирование успешно: ${foundLocation.name}. Запуск комплексного аудита...`;
-                const buildingType = document.getElementById('building_type').value;
-                startPointAnalysis(foundLocation.lat, foundLocation.lng, buildingType, foundLocation.name);
-            } else {
-                feedbackDiv.innerText = "⚠️ **Ошибка Верификации:** Указанный адрес не найден в базе сертифицированных данных.";
-            }
-        }
-        
-        async function startPointAnalysis(lat, lng, buildingType, sourceName = 'Прямой Клик') {
-            markerCount++;
-            const markerId = `point_marker_${markerCount}`;
-            const buildingName = document.getElementById('building_type').options[document.getElementById('building_type').selectedIndex].text;
-            const latFixed = lat.toFixed(4);
-            const lngFixed = lng.toFixed(4);
-
-            map.setView([lat, lng], 14); 
-            
-            let currentMarker = L.marker([lat, lng]).addTo(markers);
-            currentMarker.bindPopup(`**Объект #${markerCount}: ${buildingName}**<br>Источник: ${sourceName}<br>⏳ Идет комплексная верификация...`).openPopup();
-            
-            const resultsDiv = document.getElementById('results');
-            const newReportHtml = `<div id="${markerId}" class="result-card">
-                <h4>Отчет #${markerCount}: Точечный Геопространственный Аудит (${buildingName})</h4>
-                <p><strong>Оценка:</strong> <span class="score-box" style="background-color: gray;">...</span></p>
-            </div>`;
-            resultsDiv.innerHTML = newReportHtml + resultsDiv.innerHTML; 
-            
-            const currentReportDiv = document.getElementById(markerId);
-            
-            try {
-                const rawData = await fetchNASAData(lat, lng);
-                const { finalScore, report, finalVerdict } = getAnalysisScore(rawData, buildingType); 
-                
-                const finalColor = getColorForScore(finalScore);
-
-                currentMarker.setPopupContent(`
-                    <h3>Объект #${markerCount}: ${buildingName}</h3>
-                    <b>ИТОГОВЫЙ ОЦЕНОЧНЫЙ БАЛЛ: <span style="color:${finalColor};">${finalScore}/100</span></b>
-                    <hr style="margin: 5px 0;">
-                    <b>ВЕРДИКТ АУДИТА: ${finalVerdict.text}</b>
-                `).openPopup();
-
-                currentReportDiv.querySelector('.score-box').style.backgroundColor = finalColor;
-                currentReportDiv.querySelector('.score-box').innerText = `${finalScore}/100`;
-                
-                // Детализированный отчет HTML
-                currentReportDiv.innerHTML = `
-                    <h4>Отчет #${markerCount}: Точечный Геопространственный Аудит (${buildingName})</h4>
-                    
-                    <div class="verdict" style="background-color: ${finalVerdict.color};">
-                        ${finalVerdict.text} <br>
-                        <span style="font-size: 0.8em; font-weight: normal;">${finalVerdict.sub}</span>
-                    </div>
-
-                    <p style="margin: 15px 0;">
-                        <span style="font-size: 1.1em; font-weight: 600; color: #00BFFF;">ИТОГОВЫЙ ОЦЕНОЧНЫЙ БАЛЛ $\\mathcal{S}_{final}$:</span> 
-                        <span class="score-box" style="background-color: ${finalColor};">${finalScore}/100</span>
-                    </p>
-                    
-                    <div class="report-section">
-                        <h4>🛡️ 1. Вектор Безопасности ($\text{W}=0.40$): ${report.safety.score}/100</h4>
-                        <ul style="padding-left: 20px; list-style-type: disc;">
-                            <li>**Высота / Категория:** ${rawData.altitude} м (${rawData.landCoverCategory})</li>
-                            <li>**Сейсмический риск:** ${rawData.seismicRisk}</li>
-                            <li>**Рельеф (Склон):** ${rawData.maxSlope}^\circ$ </li>
-                            <li>**Ключевые факторы:** ${report.safety.factors.join('; ')}</li>
-                        </ul>
-                    </div>
-                    <div class="report-section">
-                        <h4>🌍 2. Вектор Устойчивости ($\text{W}=0.25$): ${report.sustainability.score}/100</h4>
-                         <ul style="padding-left: 20px; list-style-type: disc;">
-                            <li>**Плотность населения:** ${rawData.populationDensity} чел/км$^2$</li>
-                            <li>**Экологический стресс:** ${rawData.envStress}</li>
-                            <li>**Ключевые факторы:** ${report.sustainability.factors.join('; ')}</li>
-                        </ul>
-                    </div>
-                    <div class="report-section">
-                        <h4>⚕️ 3. Вектор Здоровья и Климата ($\text{W}=0.20$): ${report.healthClimate.score}/100</h4>
-                         <ul style="padding-left: 20px; list-style-type: disc;">
-                            <li>**Средняя Температура:** ${rawData.landTemp}^\circ\text{C}$</li>
-                            <li>**Ветровой потенциал:** ${rawData.windSpeed} $\text{м/с}$</li>
-                            <li>**Ключевые факторы:** ${report.healthClimate.factors.join('; ')}</li>
-                        </ul>
-                    </div>
-                    <div class="report-section">
-                        <h4>💰 4. Вектор Эффективности ($\text{W}=0.15$): ${report.efficiency.score}/100</h4>
-                         <ul style="padding-left: 20px; list-style-type: disc;">
-                            <li>**Доступность дорог:** ${rawData.roadProximity}</li>
-                            <li>**Процент плоскости:** ${rawData.flatnessPercentage}\% $</li>
-                            <li>**Ключевые факторы:** ${report.efficiency.factors.join('; ')}</li>
-                        </ul>
-                    </div>
-                `;
-
-            } catch (error) {
-                currentReportDiv.querySelector('.score-box').innerText = 'Сбой';
-                currentReportDiv.querySelector('.score-box').style.backgroundColor = '#6b7280';
-                console.error("Ошибка API:", error);
-            }
-        }
-
+        // --- Общая очистка ---
         function clearAllMarkers() {
             markers.clearLayers();
             polygonMarkers.clearLayers();
             drawnPolygons.clearLayers();
             document.getElementById('results').innerHTML = '';
-            document.getElementById('search_feedback').innerText = "";
             markerCount = 0;
-            isDrawingPolygon = false;
-            map.getContainer().classList.remove('drawing-cursor');
-            
-            L.popup()
-                .setLatLng(map.getCenter())
-                .setContent("❌ Слой Аудита очищен. Система готова к новому анализу.")
-                .openOn(map);
+            if (isDrawingPolygon) {
+                activatePolygonMode(); // Отключаем режим рисования, если он был активен
+            }
+            document.getElementById('search_feedback').innerText = "Очистка завершена. Система готова к новому Аудиту.";
+            map.setView([42.8744, 74.5980], 12); // Сброс вида на Бишкек
         }
+
     </script>
 </body>
 </html>
