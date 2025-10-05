@@ -230,7 +230,7 @@
         <!-- Кнопки управления картой -->
         <div class="control-group" style="background-color: #1F2A38;">
             <button onclick="activatePolygonMode()" style="background-color: #00BFFF;">
-                <span style="font-size: 1.2em; margin-right: 5px;">&#x29C4;</span> *Активировать Модуль Зонального Анализа* (Клик-Клик-Double Click)
+                <span style="font-size: 1.2em; margin-right: 5px;">&#x29C4;</span> Активировать Модуль Зонального Анализа (Клик-Клик-Double Click)
             </button>
             <button id="clear-button" onclick="clearAllMarkers()">
                 <span style="font-size: 1.2em; margin-right: 5px;">&#x2716;</span> Сброс и Очистка Слоя Аудита
@@ -248,7 +248,7 @@
         <p>
             Платформа SmartBuildingKG использует <strong>четыре ключевых вектора оценки</strong>, каждый из которых имеет весовой коэффициент: 
             <strong>Безопасность (40%)</strong>, Устойчивость (25%), Здоровье и Климат (20%), Эффективность (15%). 
-            Геопространственные данные симулируются на основе <strong>аттестованных климатических и топографических профилей</strong> Кыргызстана. Все отчеты следуют *Строгому Регламенту Оценки Рисков*.
+            Геопространственные данные симулируются на основе <strong>аттестованных климатических и топографических профилей</strong> Кыргызстана. Все отчеты следуют Строгому Регламенту Оценки Рисков.
         </p>
     </div>
 
@@ -396,7 +396,7 @@
             }
             
             if (reason) {
-                report.safety.factors.push(**АБСОЛЮТНЫЙ ЗАПРЕТ:** ${reason}. Нарушение Технического Регламента.);
+                report.safety.factors.push(*АБСОЛЮТНЫЙ ЗАПРЕТ:* ${reason}. Нарушение Технического Регламента.);
                 return {
                     finalScore: 0,
                     report, 
@@ -409,7 +409,7 @@
             if (data.isUrbanPlateau) {
                 const safetyBoost = 25;
                 safetyPenalty -= safetyBoost;
-                report.safety.factors.push(**ИНЖЕНЕРНЫЙ БОНУС:** Стабильное городское плато. ($+25$ по безопасности));
+                report.safety.factors.push(*ИНЖЕНЕРНЫЙ БОНУС:* Стабильное городское плато. ($+25$ по безопасности));
             }
 
             // --- 2. ВЕКТОР БЕЗОПАСНОСТИ (SAFETY & DISASTER RISK) - ВЕС 40% ---
@@ -419,7 +419,7 @@
             
             if (data.maxSlope > 20) { 
                  safetyPenalty += 60;
-                 report.safety.factors.push(**КРИТИЧЕСКИЙ РИСК:** Экстремальный уклон ($>20^\circ$). Высокий риск оползней. ($-60$));
+                 report.safety.factors.push(*КРИТИЧЕСКИЙ РИСК:* Экстремальный уклон ($>20^\circ$). Высокий риск оползней. ($-60$));
                  hardStopWarning = true; 
             } else if (data.maxSlope > 10) {
                  safetyPenalty += 25; 
@@ -559,11 +559,11 @@
                 <div class="report-section">
                     <h4>🏗 Гео-Структурные Параметры (Сырые Данные)</h4>
                     <ul style="list-style-type: disc; padding-left: 20px;">
-                        <li>*Тип Рельефа:* ${rawData.landCoverType}</li>
-                        <li>*Абс. Высота:* ${rawData.altitude} м.</li>
-                        <li>*Макс. Уклон:* ${rawData.maxSlope}$^\circ$ ($\text{Плоскость} \approx {rawData.flatnessPercentage}\%$)</li>
-                        <li>*Плотность населения $\rho$:* ${rawData.populationDensity} чел/км$^2$</li>
-                        <li>*Скорость Ветра:* ${rawData.windSpeed} м/с</li>
+                        <li>Тип Рельефа: ${rawData.landCoverType}</li>
+                        <li>Абс. Высота: ${rawData.altitude} м.</li>
+                        <li>Макс. Уклон: ${rawData.maxSlope}$^\circ$ ($\text{Плоскость} \approx {rawData.flatnessPercentage}\%$)</li>
+                        <li>Плотность населения $\rho$: ${rawData.populationDensity} чел/км$^2$</li>
+                        <li>Скорость Ветра: ${rawData.windSpeed} м/с</li>
                     </ul>
                 </div>
 
@@ -651,7 +651,7 @@
             const bounds = finalPoly.getBounds();
             const vertices = finalPoly.getLatLngs()[0]; 
 
-            finalPoly.bindPopup(**Область #${markerCount}:** ${buildingName}<br>⏳ Идет Верификация Зоны...).openPopup();
+            finalPoly.bindPopup(*Область #${markerCount}:* ${buildingName}<br>⏳ Идет Верификация Зоны...).openPopup();
 
             const newReportHtml = `<div id="${markerId}" class="result-card">
                 <h4>Отчет #${markerCount}: Зональный Геопространственный Аудит (${buildingName})</h4>
@@ -692,7 +692,7 @@
                     if (result.finalScore === 0) {
                         hardStopCount++;
                         L.circleMarker(sampleLatLng, { radius: 4, color: '#F44336', fillOpacity: 1 }).addTo(markers)
-                            .bindPopup(**Точка ${pointsFound} (КРИТИЧЕСКИЙ ОТКАЗ):** ${result.finalVerdict.sub});
+                            .bindPopup(*Точка ${pointsFound} (КРИТИЧЕСКИЙ ОТКАЗ):* ${result.finalVerdict.sub});
                     } else {
                         L.circleMarker(sampleLatLng, { radius: 2, color: getColorForScore(result.finalScore), fillOpacity: 1 }).addTo(markers);
                     }
@@ -700,7 +700,7 @@
             }
             
             if (attempts === maxAttempts) {
-                 currentReportDiv.innerHTML += <p style="color: #FF9800;">⚠ **Внимание:** Не удалось набрать 10 точек. Зональный анализ может быть неполным.</p>;
+                 currentReportDiv.innerHTML += <p style="color: #FF9800;">⚠ *Внимание:* Не удалось набрать 10 точек. Зональный анализ может быть неполным.</p>;
             }
 
             const avgScore = (pointsFound === 0) ? 0 : allScores.reduce((a, b) => a + b, 0) / pointsFound;
@@ -756,8 +756,8 @@
                 <div class="report-section">
                     <h4>📊 Статистика Зоны</h4>
                     <ul style="list-style-type: none; padding-left: 0;">
-                        <li>*Кол-во верифицированных точек:* ${pointsFound}</li>
-                        <li>*Геометрия:* Полигон (${vertices.length} вершин)</li>
+                        <li>Кол-во верифицированных точек: ${pointsFound}</li>
+                        <li>Геометрия: Полигон (${vertices.length} вершин)</li>
                     </ul>
                 </div>
             `;
@@ -777,7 +777,7 @@
                     currentPolyline = null;
                 }
                 map.getContainer().classList.add('drawing-cursor');
-                document.getElementById('search_feedback').innerText = "✅ *Режим Зонального Анализа Активен.* Кликните, чтобы добавить вершину. *Дважды кликните*, чтобы завершить и запустить аудит.";
+                document.getElementById('search_feedback').innerText = "✅ Режим Зонального Анализа Активен. Кликните, чтобы добавить вершину. Дважды кликните, чтобы завершить и запустить аудит.";
             } else {
                 map.getContainer().classList.remove('drawing-cursor');
                 document.getElementById('search_feedback').innerText = "Режим Анализа Выключен. Нажмите кнопку для активации.";
@@ -805,7 +805,7 @@
         map.on('dblclick', function(e) {
             if (!isDrawingPolygon) return;
             if (polygonPoints.length < 3) {
-                document.getElementById('search_feedback').innerText = "⚠ *Ошибка Регламента:* Для формирования зоны требуется минимум 3 вершины.";
+                document.getElementById('search_feedback').innerText = "⚠ Ошибка Регламента: Для формирования зоны требуется минимум 3 вершины.";
                 return;
             }
             
